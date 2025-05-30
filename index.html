@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store Locator & Quiz System</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" rel="stylesheet">
+    <style>
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.8);
+        }
+        .store-list {
+            height: calc(100% - 60px);
+            overflow-y: auto;
+        }
+        #map {
+            height: 400px;
+        }
+        .selected-option {
+            background-color: #d1fae5;
+        }
+        .question-index.attempted { background-color: #4ade80; }
+        .question-index.bookmarked { background-color: #fcd34d; }
+        .question-index.unattempted { background-color: white; }
+    </style>
+</head>
+<body class="bg-green-100">
+    <!-- Header -->
+    <header class="bg-white shadow-md">
+        <nav class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="relative" id="storeDropdown">
+                <button class="flex items-center space-x-2 focus:outline-none" onclick="toggleDropdown()">
+                    <i class="bi bi-geo-alt"></i>
+                    <span id="selectedStore">497 Mavis Road</span>
+                </button>
+                <div class="hidden absolute top-full left-0 bg-white shadow-lg rounded-md p-4 w-64 z-50" id="dropdownContent">
+                    <div class="font-bold">497 Mavis Road</div>
+                    <div class="text-sm text-gray-600">123 Street, City, State</div>
+                    <button class="mt-2 bg-blue-500 text-white px-4 py-2 rounded" onclick="openStoreModal()">Change Store</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Store Modal -->
+    <div class="fixed inset-0 modal-backdrop hidden" id="storeModal">
+        <div class="fixed inset-0 flex items-center justify-center">
+            <div class="bg-white rounded-lg w-4/5 max-w-4xl h-3/4">
+                <div class="p-4 border-b flex justify-between items-center">
+                    <h2 class="text-xl font-bold">Select my preferred store</h2>
+                    <button onclick="closeStoreModal()"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="p-4">
+                    <div class="relative mb-4">
+                        <input type="text" class="w-full px-4 py-2 border rounded-lg" placeholder="Search stores...">
+                        <button class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-500 text-white p-2 rounded">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                    <div class="flex">
+                        <div class="w-2/5 store-list pr-4">
+                            <!-- Store list items -->
+                            <div class="border rounded p-3 mb-2" id="store1">
+                                <h3 class="font-bold">497 Mavis Road</h3>
+                                <p class="text-sm">123 Street, City, State</p>
+                                <p class="text-sm">Phone: (123) 456-7890</p>
+                                <p class="text-sm">Hours: 9 AM - 9 PM</p>
+                                <button class="mt-2 bg-blue-500 text-white px-4 py-1 rounded">Select</button>
+                            </div>
+                            <!-- Repeat for other stores -->
+                        </div>
+                        <div class="w-3/5">
+                            <div id="map" class="rounded-lg"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Container -->
+    <div class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-3xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <div>Question <span id="currentQuestion">1</span> of 115</div>
+                <div id="timer" class="font-bold">30:00</div>
+                <div class="space-x-2">
+                    <button onclick="changeFontSize(1)" class="px-2 py-1 bg-gray-200 rounded">A+</button>
+                    <button onclick="changeFontSize(-1)" class="px-2 py-1 bg-gray-200 rounded">A-</button>
+                </div>
+            </div>
+
+            <div id="questionContent" class="mb-6">
+                <p class="text-lg mb-4">What is the capital of France?</p>
+                <div class="space-y-3">
+                    <label class="flex items-center p-3 border rounded cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="answer" class="mr-3" value="1">
+                        <span>Paris</span>
+                    </label>
+                    <label class="flex items-center p-3 border rounded cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="answer" class="mr-3" value="2">
+                        <span>London</span>
+                    </label>
+                    <label class="flex items-center p-3 border rounded cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="answer" class="mr-3" value="3">
+                        <span>Berlin</span>
+                    </label>
+                    <label class="flex items-center p-3 border rounded cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="answer" class="mr-3" value="4">
+                        <span>Madrid</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <button class="flex items-center text-blue-500" onclick="bookmarkQuestion()">
+                    <i class="bi bi-bookmark mr-1"></i> Bookmark
+                </button>
+                <div class="space-x-4">
+                    <button class="bg-gray-200 px-4 py-2 rounded" onclick="previousQuestion()">
+                        <i class="bi bi-chevron-left"></i> Previous
+                    </button>
+                    <button class="bg-gray-200 px-4 py-2 rounded" onclick="nextQuestion()">
+                        Next <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button class="bg-green-500 text-white px-4 py-2 rounded" onclick="showSubmitModal()">
+                        Submit Exam
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Submit Confirmation Modal -->
+    <div class="fixed inset-0 modal-backdrop hidden" id="submitModal">
+        <div class="fixed inset-0 flex items-center justify-center">
+            <div class="bg-white rounded-lg p-6 w-96">
+                <h3 class="text-xl font-bold mb-4">Are you sure you want to submit the exam?</h3>
+                <div class="flex justify-end space-x-4">
+                    <button class="px-4 py-2 bg-gray-200 rounded" onclick="closeSubmitModal()">No</button>
+                    <button class="px-4 py-2 bg-green-500 text-white rounded" onclick="submitExam()">Yes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Store functionality
+        function toggleDropdown() {
+            document.getElementById('dropdownContent').classList.toggle('hidden');
+        }
+
+        function openStoreModal() {
+            document.getElementById('storeModal').classList.remove('hidden');
+            initMap();
+        }
+
+        function closeStoreModal() {
+            document.getElementById('storeModal').classList.add('hidden');
+        }
+
+        function initMap() {
+            const map = L.map('map').setView([43.6532, -79.3832], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        }
+
+        // Quiz functionality
+        let fontSize = 16;
+        let currentQuestion = 1;
+        let timer = 1800; // 30 minutes in seconds
+
+        function changeFontSize(change) {
+            fontSize = Math.max(12, Math.min(24, fontSize + change));
+            document.getElementById('questionContent').style.fontSize = `${fontSize}px`;
+        }
+
+        function updateTimer() {
+            const minutes = Math.floor(timer / 60);
+            const seconds = timer % 60;
+            document.getElementById('timer').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            if (timer > 0) {
+                timer--;
+                setTimeout(updateTimer, 1000);
+            }
+        }
+
+        function showSubmitModal() {
+            document.getElementById('submitModal').classList.remove('hidden');
+        }
+
+        function closeSubmitModal() {
+            document.getElementById('submitModal').classList.add('hidden');
+        }
+
+        function submitExam() {
+            // Implement summary page navigation here
+            window.location.href = 'summary.html';
+        }
+
+        // Radio button selection handling
+        document.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.querySelectorAll('label').forEach(label => {
+                    label.classList.remove('selected-option');
+                });
+                this.closest('label').classList.add('selected-option');
+            });
+        });
+
+        // Initialize timer
+        updateTimer();
+
+        // Close dropdowns when clicking outside
+        window.onclick = function(event) {
+            if (!event.target.closest('#storeDropdown')) {
+                document.getElementById('dropdownContent').classList.add('hidden');
+            }
+        }
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
